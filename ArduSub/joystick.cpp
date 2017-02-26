@@ -50,9 +50,9 @@ void Sub::transform_manual_control_to_rc_override(int16_t x, int16_t y, int16_t 
 
     uint32_t tnow_ms = millis();
 
-    float rpyScale = 0.4*gain; // Scale -1000-1000 to -400-400 with gain
-    float throttleScale = 0.8*gain*g.throttle_gain; // Scale 0-1000 to 0-800 times gain
-    int16_t rpyCenter = 1500;
+    float rpyScale = 1.0;
+    float throttleScale = 1.0;
+    int16_t rpyCenter = 1000;
     int16_t throttleBase = 1500-500*throttleScale;
 
     bool shift = false;
@@ -80,13 +80,13 @@ void Sub::transform_manual_control_to_rc_override(int16_t x, int16_t y, int16_t 
     }
 
     // Set channels to override
-    channels[0] = 1500 + pitchTrim;                           // pitch
-    channels[1] = 1500 + rollTrim;                            // roll
-    channels[2] = constrain_int16((z+zTrim)*throttleScale+throttleBase,1100,1900);  // throttle
-    channels[3] = constrain_int16(r*rpyScale+rpyCenter,1100,1900);                       // yaw
+    channels[0] = 0 + pitchTrim;                           // pitch
+    channels[1] = 0 + rollTrim;                            // roll
+    channels[2] = constrain_int16((z+zTrim)*throttleScale+throttleBase,0,2000);  // throttle
+    channels[3] = constrain_int16(r*rpyScale+rpyCenter,0,2000);                       // yaw
     channels[4] = mode_switch_pwm;                                       // for testing only
-    channels[5] = constrain_int16((x+xTrim)*rpyScale+rpyCenter,1100,1900);           // forward for ROV
-    channels[6] = constrain_int16((y+yTrim)*rpyScale+rpyCenter,1100,1900);           // lateral for ROV
+    channels[5] = constrain_int16((x+xTrim)*rpyScale+rpyCenter,0,2000);           // forward for ROV
+    channels[6] = constrain_int16((y+yTrim)*rpyScale+rpyCenter,0,2000);           // lateral for ROV
     channels[7] = 0xffff;                                     // camera tilt (sent in camera_tilt_smooth)
     channels[8] = lights1;                                    // lights 1
     channels[9] = lights2;                                    // lights 2
