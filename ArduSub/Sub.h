@@ -81,8 +81,9 @@
 #include <AP_Terrain/AP_Terrain.h>
 #include <AC_InputManager/AC_InputManager.h>        // Pilot input handling library
 #include <AP_JSButton/AP_JSButton.h>   // Joystick/gamepad button function assignment
-#include "../libraries/AP_LeakDetector/AP_LeakDetector.h" // Leak detector
+#include <AP_LeakDetector/AP_LeakDetector.h> // Leak detector
 #include <AP_TemperatureSensor/TSYS01.h>
+#include "AP_Arming_Sub.h"
 #include "defines.h"
 #include "config.h"
 
@@ -121,6 +122,7 @@ public:
     friend class GCS_MAVLINK_Sub;
     friend class Parameters;
     friend class ParametersG2;
+    friend class AP_Arming_Sub;
 
     Sub(void);
 
@@ -176,7 +178,7 @@ private:
     Compass compass;
     AP_InertialSensor ins;
 
-    RangeFinder rangefinder {serial_manager};
+    RangeFinder rangefinder {serial_manager, ROTATION_PITCH_270};
     struct {
         bool enabled:1;
         bool alt_healthy:1; // true if we can trust the altitude from the rangefinder
@@ -228,31 +230,29 @@ private:
 # include USERHOOK_VARIABLES
 #endif
 
-    // Documentation of GLobals:
+    // Documentation of Globals:
     union {
         struct {
-            uint8_t unused1             : 1; // 0
-            uint8_t simple_mode         : 2; // 1,2     // This is the state of simple mode : 0 = disabled ; 1 = SIMPLE ; 2 = SUPERSIMPLE
-            uint8_t pre_arm_rc_check    : 1; // 3       // true if rc input pre-arm checks have been completed successfully
-            uint8_t pre_arm_check       : 1; // 4       // true if all pre-arm checks (rc, accel calibration, gps lock) have been performed
-            uint8_t auto_armed          : 1; // 5       // stops auto missions from beginning until throttle is raised
-            uint8_t logging_started     : 1; // 6       // true if dataflash logging has started
-            uint8_t new_radio_frame     : 1; // 8       // Set true if we have new PWM data to act on from the Radio
-            uint8_t usb_connected       : 1; // 9       // true if APM is powered from USB connection
-            uint8_t rc_receiver_present : 1; // 10      // true if we have an rc receiver present (i.e. if we've ever received an update
-            uint8_t compass_mot         : 1; // 11      // true if we are currently performing compassmot calibration
-            uint8_t motor_test          : 1; // 12      // true if we are currently performing the motors test
-            uint8_t initialised         : 1; // 13      // true once the init_ardupilot function has completed.  Extended status to GCS is not sent until this completes
-            uint8_t throttle_zero       : 1; // 15      // true if the throttle stick is at zero, debounced, determines if pilot intends shut-down when not using motor interlock
-            uint8_t system_time_set     : 1; // 16      // true if the system time has been set from the GPS
-            uint8_t gps_base_pos_set    : 1; // 17      // true when the gps base position has been set (used for RTK gps only)
-            enum HomeState home_state   : 2; // 18,19   // home status (unset, set, locked)
-            uint8_t using_interlock     : 1; // 20      // aux switch motor interlock function is in use
-            uint8_t motor_emergency_stop: 1; // 21      // motor estop switch, shuts off motors when enabled
-            uint8_t land_repo_active    : 1; // 22      // true if the pilot is overriding the landing position
-            uint8_t at_bottom           : 1;            // true if we are at the bottom
-            uint8_t at_surface          : 1;            // true if we are at the surface
-            uint8_t depth_sensor_present: 1;            // true if we have an external baro connected
+            uint8_t simple_mode         : 2; // This is the state of simple mode : 0 = disabled ; 1 = SIMPLE ; 2 = SUPERSIMPLE
+            uint8_t pre_arm_check       : 1; // true if all pre-arm checks (rc, accel calibration, gps lock) have been performed
+            uint8_t auto_armed          : 1; // stops auto missions from beginning until throttle is raised
+            uint8_t logging_started     : 1; // true if dataflash logging has started
+            uint8_t new_radio_frame     : 1; // Set true if we have new PWM data to act on from the Radio
+            uint8_t usb_connected       : 1; // true if APM is powered from USB connection
+            uint8_t rc_receiver_present : 1; // true if we have an rc receiver present (i.e. if we've ever received an update
+            uint8_t compass_mot         : 1; // true if we are currently performing compassmot calibration
+            uint8_t motor_test          : 1; // true if we are currently performing the motors test
+            uint8_t initialised         : 1; // true once the init_ardupilot function has completed.  Extended status to GCS is not sent until this completes
+            uint8_t throttle_zero       : 1; // true if the throttle stick is at zero, debounced, determines if pilot intends shut-down when not using motor interlock
+            uint8_t system_time_set     : 1; // true if the system time has been set from the GPS
+            uint8_t gps_base_pos_set    : 1; // true when the gps base position has been set (used for RTK gps only)
+            enum HomeState home_state   : 2; // home status (unset, set, locked)
+            uint8_t using_interlock     : 1; // aux switch motor interlock function is in use
+            uint8_t motor_emergency_stop: 1; // motor estop switch, shuts off motors when enabled
+            uint8_t land_repo_active    : 1; // true if the pilot is overriding the landing position
+            uint8_t at_bottom           : 1; // true if we are at the bottom
+            uint8_t at_surface          : 1; // true if we are at the surface
+            uint8_t depth_sensor_present: 1; // true if we have an external baro connected
         };
         uint32_t value;
     } ap;
@@ -348,6 +348,8 @@ private:
 
     // Battery Sensors
     AP_BattMonitor battery;
+
+    AP_Arming_Sub arming {ahrs, barometer, compass, battery};
 
     // Altitude
     // The cm/s we are moving up or down based on filtered data - Positive = UP
@@ -506,7 +508,6 @@ private:
     void set_simple_mode(uint8_t b);
     void set_failsafe_battery(bool b);
     void set_pre_arm_check(bool b);
-    void set_pre_arm_rc_check(bool b);
     void update_using_interlock();
     void set_motor_emergency_stop(bool b);
     float get_smoothing_gain();
@@ -546,10 +547,6 @@ private:
     void gcs_check_input(void);
     void gcs_send_text(MAV_SEVERITY severity, const char *str);
     void do_erase_logs(void);
-#if AUTOTUNE_ENABLED == ENABLED
-    void Log_Write_AutoTune(uint8_t axis, uint8_t tune_step, float meas_target, float meas_min, float meas_max, float new_gain_rp, float new_gain_rd, float new_gain_sp, float new_ddt);
-    void Log_Write_AutoTuneDetails(float angle_cd, float rate_cds);
-#endif
     void Log_Write_Current();
     void Log_Write_Optflow();
     void Log_Write_Nav_Tuning();
@@ -597,7 +594,6 @@ private:
     bool verify_yaw();
     void do_take_picture();
     void log_picture();
-    uint8_t mavlink_compassmot(mavlink_channel_t chan);
     bool acro_init(bool ignore_checks);
     void acro_run();
     void get_pilot_desired_angle_rates(int16_t roll_in, int16_t pitch_in, int16_t yaw_in, float &roll_out, float &pitch_out, float &yaw_out);
@@ -624,30 +620,6 @@ private:
     void set_auto_yaw_look_at_heading(float angle_deg, float turn_rate_dps, int8_t direction, uint8_t relative_angle);
     void set_auto_yaw_roi(const Location &roi_location);
     float get_auto_heading(void);
-#if AUTOTUNE_ENABLED == ENABLED
-    bool autotune_init(bool ignore_checks);
-    void autotune_stop();
-    bool autotune_start(bool ignore_checks);
-    void autotune_run();
-    void autotune_attitude_control();
-    void autotune_backup_gains_and_initialise();
-    void autotune_load_orig_gains();
-    void autotune_load_tuned_gains();
-    void autotune_load_intra_test_gains();
-    void autotune_load_twitch_gains();
-    void autotune_save_tuning_gains();
-    void autotune_update_gcs(uint8_t message_id);
-    bool autotune_roll_enabled();
-    bool autotune_pitch_enabled();
-    bool autotune_yaw_enabled();
-    void autotune_twitching_test(float measurement, float target, float &measurement_min, float &measurement_max);
-    void autotune_updating_d_up(float &tune_d, float tune_d_min, float tune_d_max, float tune_d_step_ratio, float &tune_p, float tune_p_min, float tune_p_max, float tune_p_step_ratio, float target, float measurement_min, float measurement_max);
-    void autotune_updating_d_down(float &tune_d, float tune_d_min, float tune_d_step_ratio, float &tune_p, float tune_p_min, float tune_p_max, float tune_p_step_ratio, float target, float measurement_min, float measurement_max);
-    void autotune_updating_p_down(float &tune_p, float tune_p_min, float tune_p_step_ratio, float target, float measurement_max);
-    void autotune_updating_p_up(float &tune_p, float tune_p_max, float tune_p_step_ratio, float target, float measurement_max);
-    void autotune_updating_p_up_d_down(float &tune_d, float tune_d_min, float tune_d_step_ratio, float &tune_p, float tune_p_min, float tune_p_max, float tune_p_step_ratio, float target, float measurement_min, float measurement_max);
-    void autotune_twitching_measure_acceleration(float &rate_of_change, float rate_measurement, float &rate_measurement_max);
-#endif
     bool circle_init(bool ignore_checks);
     void circle_run();
     bool guided_init(bool ignore_checks);
@@ -723,15 +695,6 @@ private:
     void motor_test_stop();
     void auto_disarm_check();
     bool init_arm_motors(bool arming_from_gcs);
-    void update_arming_checks(void);
-    bool all_arming_checks_passing(bool arming_from_gcs);
-    bool pre_arm_checks(bool display_failure);
-    void pre_arm_rc_checks();
-    bool pre_arm_gps_checks(bool display_failure);
-    bool pre_arm_ekf_attitude_check();
-    bool pre_arm_rallypoint_check();
-    bool pre_arm_terrain_check(bool display_failure);
-    bool arm_checks(bool display_failure, bool arming_from_gcs);
     void init_disarm_motors();
     void motors_output();
     void lost_vehicle_check();
@@ -875,6 +838,8 @@ private:
     void auto_terrain_recover_run(void);
 
     void translate_wpnav_rp(float &lateral_out, float &forward_out);
+    void translate_circle_nav_rp(float &lateral_out, float &forward_out);
+    void translate_pos_control_rp(float &lateral_out, float &forward_out);
 
     bool surface_init(bool ignore_flags);
     void surface_run();

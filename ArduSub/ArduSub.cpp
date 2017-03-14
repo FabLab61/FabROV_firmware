@@ -172,15 +172,14 @@ void Sub::loop()
 // Main loop - 400hz
 void Sub::fast_loop()
 {
-
-    // IMU DCM Algorithm
-    // --------------------
-    read_AHRS();
-
     if (control_mode != MANUAL) { //don't run rate controller in manual mode
         // run low level rate controllers that only require IMU data
         attitude_control.rate_controller_run();
     }
+
+    // IMU DCM Algorithm
+    // --------------------
+    read_AHRS();
 
     // send outputs to the motors library
     motors_output();
@@ -372,11 +371,12 @@ void Sub::three_hz_loop()
 // one_hz_loop - runs at 1Hz
 void Sub::one_hz_loop()
 {
+    AP_Notify::flags.pre_arm_check = arming.pre_arm_checks(false);
+    AP_Notify::flags.pre_arm_gps_check = position_ok();
+
     if (should_log(MASK_LOG_ANY)) {
         Log_Write_Data(DATA_AP_STATE, ap.value);
     }
-
-    update_arming_checks();
 
     if (!motors.armed()) {
         // make it possible to change ahrs orientation at runtime during initial config
@@ -512,6 +512,7 @@ void Sub::read_AHRS(void)
 #endif
 
     ahrs.update();
+    ahrs_view.update();
 }
 
 // read baro and rangefinder altitude at 10hz

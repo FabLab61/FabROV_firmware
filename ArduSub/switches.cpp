@@ -209,7 +209,7 @@ void Sub::do_aux_switch_function(int8_t ch_function, uint8_t ch_flag)
     case AUXSW_RANGEFINDER:
         // enable or disable the sonar
 #if RANGEFINDER_ENABLED == ENABLED
-        if ((ch_flag == AUX_SWITCH_HIGH) && (rangefinder.num_sensors() >= 1)) {
+        if ((ch_flag == AUX_SWITCH_HIGH) && rangefinder.has_orientation(ROTATION_PITCH_270)) {
             rangefinder_state.enabled = true;
         } else {
             rangefinder_state.enabled = false;
@@ -279,25 +279,6 @@ void Sub::do_aux_switch_function(int8_t ch_function, uint8_t ch_flag)
             }
         }
         break;
-
-#if AUTOTUNE_ENABLED == ENABLED
-    case AUXSW_AUTOTUNE:
-        // turn on auto tuner
-        switch (ch_flag) {
-        case AUX_SWITCH_LOW:
-        case AUX_SWITCH_MIDDLE:
-            // restore flight mode based on flight mode switch position
-            if (control_mode == AUTOTUNE) {
-                //                        reset_control_switch();
-            }
-            break;
-        case AUX_SWITCH_HIGH:
-            // start an autotuning session
-            set_mode(AUTOTUNE);
-            break;
-        }
-        break;
-#endif
 
     case AUXSW_LAND:
         // Do nothing for Sub
